@@ -346,6 +346,10 @@ const fmtDateF = ms => { const d = new Date(ms); return `${d.getFullYear()}.${pa
 const CAT_LABEL = {ANY:"Any%", AA:"All Advancements", HIGH:"High%"};
 const RT_LABEL  = {set_seed:"Set Seed", random_seed:"Random Seed"};
 const isRanked = r => r.world.startsWith("mcsrranked");
+// Only worlds named by an actual run (not practice maps, which SpeedRunIGT
+// times too but which are never "cleared") are loaded: "Random Speedrun
+// #<n>", "Set Speedrun #<n>", or an mcsrranked match world.
+const isValidWorldName = name => !!name && (/^(Random|Set) Speedrun #\d+$/.test(name) || name.startsWith("mcsrranked"));
 
 // ── record json → compact run (JS port of the aggregation) ─
 // Note: SpeedRunIGT also writes a record file for runs that were never
@@ -353,6 +357,7 @@ const isRanked = r => r.world.startsWith("mcsrranked");
 // too so failed attempts show up alongside completions.
 function aggregate(d){
   if(!d || d.final_igt == null) return null;
+  if(!isValidWorldName(d.world_name)) return null;
   let st = {};
   try{ st = d.stats[Object.keys(d.stats)[0]].stats || {}; }catch(e){}
   const g = (c,k) => (st[c] && st[c][k]) || 0;
@@ -405,6 +410,8 @@ let sortKey="date", filterKey="all", statusKey="all";
 
 function setData(runs, sourceMs){
   if(!runs || !runs.length) return;
+  runs = runs.filter(r=>isValidWorldName(r.world)); // guards stale cache from before this check existed
+  if(!runs.length) return;
   RUNS = runs;
   allByDate = [...RUNS].sort((a,b)=>a.date-b.date);
   completed = RUNS.filter(r=>r.completed);
