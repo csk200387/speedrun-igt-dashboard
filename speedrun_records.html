@@ -166,6 +166,13 @@
     color:#000;background:var(--bad);font-size:11px;font-weight:700;
     padding:1px 6px;border:1px solid #000;text-shadow:none;
   }
+  .cycletag{
+    font-size:10px;font-weight:700;margin-left:6px;padding:1px 5px;
+    border:1px solid rgba(0,0,0,.6);text-shadow:none;vertical-align:middle;
+    cursor:help;
+  }
+  .cycletag.zc{color:#000;background:var(--xp)}
+  .cycletag.oc{color:var(--ink-3);background:transparent;border-color:rgba(255,255,255,.15)}
   .rdate{color:var(--ink-3);font-size:12px;margin-left:auto;text-shadow:var(--shadow)}
   .run-time{display:flex;align-items:baseline;gap:14px;margin:4px 0 8px}
   .igt{color:var(--gold);font-family:'GalmuriMono11',monospace;font-size:24px;font-weight:700;text-shadow:var(--shadow)}
@@ -557,6 +564,20 @@ function phaseSegments(r){
 }
 const lastPhase = r => phaseSegments(r).at(-1)[0];
 
+// SpeedRunIGT doesn't record dragon perch count, so there's no way to
+// directly detect a zero-cycle (kill before the dragon's first perch) vs.
+// a one-cycle (kill during/after its first perch). This is a heuristic
+// based on End dimension time only — a real zero-cycle has no perch-wait
+// at all and is comfortably under this; a one-cycle includes a full perch
+// dwell and commonly runs close to (or over) it. Not a confirmed detection.
+const ZERO_CYCLE_MS = 90000;
+function cycleTag(r){
+  const {enter_end, kill_ender_dragon} = r.splits;
+  if(enter_end == null || kill_ender_dragon == null) return "";
+  const zero = (kill_ender_dragon - enter_end) < ZERO_CYCLE_MS;
+  return ` <span class="cycletag ${zero?"zc":"oc"}" title="Estimated from End time (under ${fmt(ZERO_CYCLE_MS)} = Zero Cycle) — not a confirmed detection">${zero?"Zero Cycle":"One Cycle"}</span>`;
+}
+
 function dimbar(r){
   const total = r.igt;
   const segs = phaseSegments(r);
@@ -580,7 +601,8 @@ function runCard(r){
       delta = `<span class="${d<0?"d-good":d>0?"d-bad":"d-zero"}">${fmtDelta(d)}</span>`;
     } else delta = `<span class="d-zero">${pb?"Ref":"—"}</span>`;
     const ph = PHASE_OF[k] ? `<span class="dot" style="background:var(--${PHASE_OF[k]})"></span>` : `<span class="dot" style="background:transparent;border-color:transparent"></span>`;
-    return `<tr><td>${ph}${label}</td><td class="num">${fmt(t,true)}</td><td class="num">+${fmt(t-prev)}</td><td class="num">${delta}</td></tr>`;
+    const tag = k==="kill_ender_dragon" ? cycleTag(r) : "";
+    return `<tr><td>${ph}${label}${tag}</td><td class="num">${fmt(t,true)}</td><td class="num">+${fmt(t-prev)}</td><td class="num">${delta}</td></tr>`;
   }).join("");
   const fin = r.completed
     ? `<tr class="total"><td><span class="dot" style="background:transparent;border-color:transparent"></span>Finish</td><td class="num">${fmt(r.igt,true)}</td><td class="num"></td><td class="num">${pb||!pbRun?"":`<span class="${r.igt>pbRun.igt?"d-bad":"d-zero"}">${fmtDelta(r.igt-pbRun.igt)}</span>`}</td></tr>`

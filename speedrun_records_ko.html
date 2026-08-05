@@ -166,6 +166,13 @@
     color:#000;background:var(--bad);font-size:11px;font-weight:700;
     padding:1px 6px;border:1px solid #000;text-shadow:none;
   }
+  .cycletag{
+    font-size:10px;font-weight:700;margin-left:6px;padding:1px 5px;
+    border:1px solid rgba(0,0,0,.6);text-shadow:none;vertical-align:middle;
+    cursor:help;
+  }
+  .cycletag.zc{color:#000;background:var(--xp)}
+  .cycletag.oc{color:var(--ink-3);background:transparent;border-color:rgba(255,255,255,.15)}
   .rdate{color:var(--ink-3);font-size:12px;margin-left:auto;text-shadow:var(--shadow)}
   .run-time{display:flex;align-items:baseline;gap:14px;margin:4px 0 8px}
   .igt{color:var(--gold);font-family:'GalmuriMono11',monospace;font-size:24px;font-weight:700;text-shadow:var(--shadow)}
@@ -556,6 +563,19 @@ function phaseSegments(r){
 }
 const lastPhase = r => phaseSegments(r).at(-1)[0];
 
+// SpeedRunIGT는 드래곤 퍼치 횟수를 기록하지 않기 때문에 Zero Cycle(드래곤이
+// 첫 퍼치를 하기 전에 처치)과 One Cycle(첫 퍼치 때 처치)을 정확히 구분할 방법이
+// 없습니다. 엔드 체류 시간만으로 근사 판단합니다 — 진짜 Zero Cycle은 퍼치
+// 대기 시간이 아예 없어 이 기준보다 확실히 짧고, One Cycle은 퍼치 체류
+// 시간이 더해져 보통 이 기준에 가깝거나 넘습니다. 확정된 판정은 아닙니다.
+const ZERO_CYCLE_MS = 90000;
+function cycleTag(r){
+  const {enter_end, kill_ender_dragon} = r.splits;
+  if(enter_end == null || kill_ender_dragon == null) return "";
+  const zero = (kill_ender_dragon - enter_end) < ZERO_CYCLE_MS;
+  return ` <span class="cycletag ${zero?"zc":"oc"}" title="엔드 체류 시간 기준 추정치 (${fmt(ZERO_CYCLE_MS)} 미만 = Zero Cycle) — 확정된 판정이 아닙니다">${zero?"Zero Cycle":"One Cycle"}</span>`;
+}
+
 function dimbar(r){
   const total = r.igt;
   const segs = phaseSegments(r);
@@ -579,7 +599,8 @@ function runCard(r){
       delta = `<span class="${d<0?"d-good":d>0?"d-bad":"d-zero"}">${fmtDelta(d)}</span>`;
     } else delta = `<span class="d-zero">${pb?"기준":"—"}</span>`;
     const ph = PHASE_OF[k] ? `<span class="dot" style="background:var(--${PHASE_OF[k]})"></span>` : `<span class="dot" style="background:transparent;border-color:transparent"></span>`;
-    return `<tr><td>${ph}${label}</td><td class="num">${fmt(t,true)}</td><td class="num">+${fmt(t-prev)}</td><td class="num">${delta}</td></tr>`;
+    const tag = k==="kill_ender_dragon" ? cycleTag(r) : "";
+    return `<tr><td>${ph}${label}${tag}</td><td class="num">${fmt(t,true)}</td><td class="num">+${fmt(t-prev)}</td><td class="num">${delta}</td></tr>`;
   }).join("");
   const fin = r.completed
     ? `<tr class="total"><td><span class="dot" style="background:transparent;border-color:transparent"></span>완주</td><td class="num">${fmt(r.igt,true)}</td><td class="num"></td><td class="num">${pb||!pbRun?"":`<span class="${r.igt>pbRun.igt?"d-bad":"d-zero"}">${fmtDelta(r.igt-pbRun.igt)}</span>`}</td></tr>`
