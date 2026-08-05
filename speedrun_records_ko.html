@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>스피드런 완주 기록</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@latest/dist/galmuri.css">
+<style>
+  :root{
+    --surface:#26221c;      /* card / chart surface (validated) */
+    --slot:#17130e;         /* inset slot */
+    --ink:#ffffff;
+    --ink-2:#cfc9bd;
+    --ink-3:#a8a29a;
+    --gold:#FFAA00;         /* time values */
+    --yellow:#FFFF55;       /* PB / highlight */
+    --xp:#7EFC20;           /* trend line */
+    --good:#55FF55;
+    --bad:#FF5555;
+    --ow:#6ba13c; --nether:#c25a4e; --sh:#35a698; --end:#a06fd8;
+    --shadow:2px 2px 0 rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:'Galmuri11','DungGeunMo','Apple SD Gothic Neo',monospace;
+    color:var(--ink);
+    background:#1c130a;
+    image-rendering:pixelated;
+    line-height:1.55;
+    padding:28px 16px 64px;
+  }
+  .wrap{max-width:860px;margin:0 auto}
+
+  /* ── minecraft bevel pieces ─────────────────────────── */
+  .panel{
+    background:var(--surface);
+    border:2px solid #000;
+    box-shadow:inset 2px 2px 0 rgba(255,255,255,.14), inset -2px -2px 0 rgba(0,0,0,.55);
+  }
+  .slot{
+    background:var(--slot);
+    border:2px solid #000;
+    box-shadow:inset 2px 2px 0 rgba(0,0,0,.6), inset -2px -2px 0 rgba(255,255,255,.07);
+  }
+
+  /* ── header ─────────────────────────────────────────── */
+  header{text-align:center;margin-bottom:26px}
+  .title-row{display:flex;align-items:center;justify-content:center;gap:14px}
+  .title-row canvas{width:40px;height:40px;image-rendering:pixelated}
+  h1{
+    font-family:'Galmuri11';font-weight:700;
+    font-size:33px;letter-spacing:1px;
+    text-shadow:3px 3px 0 rgba(0,0,0,.6);
+  }
+  .sub{color:var(--ink-3);font-size:13px;margin-top:6px;text-shadow:var(--shadow)}
+
+  /* PB advancement toast */
+  .toast{
+    display:flex;align-items:center;gap:14px;
+    margin:20px auto 0;padding:10px 20px 10px 12px;
+    width:fit-content;max-width:100%;
+    background:#141017;
+    border:2px solid #000;
+    box-shadow:inset 0 0 0 2px #8a5a1e, inset 2px 2px 0 3px rgba(255,215,90,.25), 3px 3px 0 rgba(0,0,0,.4);
+    position:relative;overflow:hidden;
+  }
+  .toast canvas{width:36px;height:42px;image-rendering:pixelated;flex:none}
+  .toast .t1{color:var(--yellow);font-size:14px;text-shadow:var(--shadow)}
+  .toast .t2{font-size:16px;text-shadow:var(--shadow)}
+  .toast .t2 b{color:var(--gold);font-family:'GalmuriMono11','Galmuri11',monospace;font-size:20px;font-weight:700}
+  .toast .t2 span{color:var(--ink-3);font-size:12px}
+  .toast::after{ /* enchant glint */
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(115deg,transparent 42%,rgba(200,120,255,.28) 50%,transparent 58%);
+    transform:translateX(-110%);
+    animation:glint 4.5s ease-in-out infinite;
+  }
+  @keyframes glint{0%,55%{transform:translateX(-110%)}85%,100%{transform:translateX(110%)}}
+
+  /* data source / refresh */
+  .datastate{
+    margin-top:14px;display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;
+    color:var(--ink-3);font-size:12px;text-shadow:var(--shadow);
+  }
+  .datastate .warn{color:var(--bad)}
+
+  /* ── stat tiles ─────────────────────────────────────── */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:22px}
+  .tile{padding:12px 14px;text-align:center}
+  .tile .lab{color:var(--ink-3);font-size:12px;text-shadow:var(--shadow)}
+  .tile .val{font-size:24px;font-weight:700;margin-top:2px;text-shadow:var(--shadow)}
+  .tile .val.time{color:var(--gold);font-family:'GalmuriMono11','Galmuri11',monospace}
+
+  /* ── sections ───────────────────────────────────────── */
+  .sec-h{
+    display:flex;align-items:baseline;gap:10px;
+    margin:26px 2px 10px;
+  }
+  .sec-h h2{font-size:17px;font-weight:700;text-shadow:var(--shadow)}
+  .sec-h .note{color:var(--ink-3);font-size:12px;text-shadow:var(--shadow)}
+
+  /* ── trend chart ────────────────────────────────────── */
+  .chart-box{padding:14px 14px 8px;position:relative}
+  .chart-box svg{display:block;width:100%;height:auto}
+  .tick-t{fill:var(--ink-3);font-family:'Galmuri9','Galmuri11',monospace;font-size:11px}
+  .chart-tip{
+    position:absolute;pointer-events:none;display:none;z-index:5;
+    background:#100c14;border:2px solid #000;
+    box-shadow:inset 0 0 0 2px #2d2440;
+    padding:7px 10px;font-size:12px;white-space:nowrap;
+    text-shadow:var(--shadow);
+  }
+  .chart-tip .tt-time{color:var(--gold);font-family:'GalmuriMono11',monospace;font-size:15px;font-weight:700}
+  .chart-tip .tt-sub{color:var(--ink-3);font-size:11px}
+
+  /* ── controls ───────────────────────────────────────── */
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:18px 0 12px}
+  .ctl-lab{color:var(--ink-3);font-size:12px;text-shadow:var(--shadow);margin-right:2px}
+  .mcbtn{
+    font-family:inherit;font-size:13px;color:var(--ink);
+    text-shadow:var(--shadow);cursor:pointer;
+    padding:7px 14px 6px;
+    background:linear-gradient(#7d7d7d,#6a6a6a 45%,#5e5e5e);
+    border:2px solid #000;
+    box-shadow:inset 2px 2px 0 rgba(255,255,255,.35), inset -2px -2px 0 rgba(0,0,0,.45);
+  }
+  .mcbtn:hover{background:linear-gradient(#8b95c9,#7583bd 45%,#6774ad)}
+  .mcbtn[aria-pressed="true"]{
+    color:var(--yellow);
+    background:linear-gradient(#4f4f4f,#454545 45%,#3d3d3d);
+    box-shadow:inset 2px 2px 0 rgba(0,0,0,.5), inset -2px -2px 0 rgba(255,255,255,.12);
+  }
+  .mcbtn:disabled{opacity:.6;cursor:default}
+  .mcbtn.small{font-size:12px;padding:4px 10px 3px}
+  .spacer{flex:1}
+
+  /* legend */
+  .legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 2px 10px;font-size:12px;color:var(--ink-2)}
+  .legend .key{display:flex;align-items:center;gap:6px;text-shadow:var(--shadow)}
+  .legend .sw{width:10px;height:10px;border:1px solid rgba(0,0,0,.6);flex:none}
+
+  /* ── run cards ──────────────────────────────────────── */
+  .run{margin-bottom:10px}
+  .run summary{
+    list-style:none;cursor:pointer;padding:12px 14px 13px;
+    display:block;position:relative;
+  }
+  .run summary::-webkit-details-marker{display:none}
+  .run summary:hover{background:rgba(255,255,255,.045)}
+  .run[open] summary .arrow{transform:rotate(90deg)}
+  .arrow{
+    display:inline-block;color:var(--ink-3);font-size:11px;
+    transition:transform .12s steps(2);margin-right:8px;
+  }
+  .run-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .rank{font-family:'GalmuriMono11',monospace;font-size:12px;color:var(--ink-3);text-shadow:var(--shadow);min-width:34px}
+  .rank.r1{color:var(--yellow)} .rank.r2{color:#d8d8d8} .rank.r3{color:#e0915c}
+  .rank.fail{color:var(--bad)}
+  .wname{font-weight:700;font-size:15px;text-shadow:var(--shadow)}
+  .pbtag{
+    color:#000;background:var(--yellow);font-size:11px;font-weight:700;
+    padding:1px 6px;border:1px solid #000;text-shadow:none;
+  }
+  .failtag{
+    color:#000;background:var(--bad);font-size:11px;font-weight:700;
+    padding:1px 6px;border:1px solid #000;text-shadow:none;
+  }
+  .rdate{color:var(--ink-3);font-size:12px;margin-left:auto;text-shadow:var(--shadow)}
+  .run-time{display:flex;align-items:baseline;gap:14px;margin:4px 0 8px}
+  .igt{color:var(--gold);font-family:'GalmuriMono11',monospace;font-size:24px;font-weight:700;text-shadow:var(--shadow)}
+  .rta{color:var(--ink-3);font-size:12px;text-shadow:var(--shadow)}
+  .died-at{color:var(--bad);font-size:12px;text-shadow:var(--shadow)}
+
+  /* dimension bar (xp-bar style) */
+  .dimbar{height:20px;padding:2px;display:flex;gap:2px}
+  .dimbar i{height:100%;min-width:3px;display:block}
+  .dimbar i:last-child{border-radius:0 2px 2px 0}
+  .dimbar .p0{background:var(--ow)} .dimbar .p1{background:var(--nether)}
+  .dimbar .p2{background:var(--sh)} .dimbar .p3{background:var(--end)}
+
+  /* expanded body */
+  .run-body{padding:2px 14px 14px;border-top:2px solid rgba(0,0,0,.45)}
+  .tscroll{overflow-x:auto}
+  table{width:100%;min-width:330px;border-collapse:collapse;margin-top:10px}
+  th{
+    text-align:left;color:var(--ink-3);font-size:11px;font-weight:400;
+    padding:2px 8px 6px;text-shadow:var(--shadow);border-bottom:2px solid rgba(0,0,0,.5);
+  }
+  td{
+    padding:5px 8px;font-size:13px;text-shadow:var(--shadow);
+    border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right;font-family:'GalmuriMono11',monospace;font-variant-numeric:tabular-nums}
+  td .dot{display:inline-block;width:8px;height:8px;margin-right:8px;border:1px solid rgba(0,0,0,.6)}
+  tr.total td{border-top:2px solid rgba(0,0,0,.5);font-weight:700}
+  tr.total td.num{color:var(--gold)}
+  .d-good{color:var(--good)} .d-bad{color:var(--bad)} .d-zero{color:var(--ink-3)}
+  tr.total.fail td{color:var(--bad)}
+  tr.total.fail td:first-child{color:var(--ink-2)}
+  .mini{color:var(--ink-3);font-size:12px;margin-top:10px;text-shadow:var(--shadow)}
+
+  /* PB card frame */
+  .run.pb{border-color:#8a5a1e;box-shadow:inset 2px 2px 0 rgba(255,222,89,.22), inset -2px -2px 0 rgba(0,0,0,.55), 0 0 0 2px #000}
+  /* failed / DNF card frame */
+  .run.fail{border-color:#5a1e1e}
+  .run.pb summary{position:relative;overflow:hidden}
+  .run.pb summary::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(115deg,transparent 44%,rgba(200,120,255,.16) 50%,transparent 56%);
+    transform:translateX(-120%);animation:glint 6s ease-in-out infinite;
+  }
+
+  footer{margin-top:34px;text-align:center;color:#6f6a62;font-size:11px;text-shadow:var(--shadow)}
+
+  :focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){
+    .toast::after,.run.pb summary::after{animation:none;display:none}
+    .arrow{transition:none}
+  }
+  @media (max-width:640px){
+    .tiles{grid-template-columns:repeat(2,1fr)}
+    h1{font-size:24px}
+    .rdate{margin-left:0;width:100%}
+    .rank{min-width:0}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="title-row">
+      <canvas id="ico-grass" width="10" height="10" aria-hidden="true"></canvas>
+      <h1>스피드런 완주 기록</h1>
+    </div>
+    <p class="sub" id="subline"></p>
+    <div class="toast" id="pb-toast" role="note" aria-label="개인 최고 기록">
+      <canvas id="ico-egg" width="12" height="14" aria-hidden="true"></canvas>
+      <div>
+        <div class="t1">신기록 달성!</div>
+        <div class="t2" id="pb-line"></div>
+      </div>
+    </div>
+    <div class="datastate">
+      <span id="data-note"></span>
+      <button class="mcbtn small" id="btn-refresh">새로고침</button>
+      <span id="refresh-note"></span>
+    </div>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="sec-h">
+    <h2>기록 추이</h2>
+    <span class="note">완주한 런의 인게임 시간(IGT) 추이</span>
+  </div>
+  <div class="chart-box panel" id="chart-box">
+    <div class="chart-tip" id="chart-tip"></div>
+  </div>
+
+  <div class="sec-h">
+    <h2>런 기록</h2>
+    <span class="note" id="list-note"></span>
+  </div>
+
+  <div class="controls">
+    <span class="ctl-lab">정렬</span>
+    <button class="mcbtn" data-sort="date" aria-pressed="true">최신순</button>
+    <button class="mcbtn" data-sort="igt" aria-pressed="false">빠른순</button>
+    <span class="spacer"></span>
+    <span class="ctl-lab">상태</span>
+    <button class="mcbtn" data-status="all" aria-pressed="true">전체</button>
+    <button class="mcbtn" data-status="completed" aria-pressed="false">완주</button>
+    <button class="mcbtn" data-status="failed" aria-pressed="false">실패</button>
+    <span class="ctl-lab">월드</span>
+    <button class="mcbtn" data-filter="all" aria-pressed="true">전체</button>
+    <button class="mcbtn" data-filter="ranked" aria-pressed="false">랭크드</button>
+    <button class="mcbtn" data-filter="set" aria-pressed="false">기타</button>
+  </div>
+
+  <div class="legend">
+    <span class="key"><span class="sw" style="background:var(--ow)"></span>오버월드</span>
+    <span class="key"><span class="sw" style="background:var(--nether)"></span>네더</span>
+    <span class="key"><span class="sw" style="background:var(--sh)"></span>스트롱홀드 탐색</span>
+    <span class="key"><span class="sw" style="background:var(--end)"></span>엔드</span>
+  </div>
+
+  <div id="list"></div>
+
+  <input type="file" id="dir-input" webkitdirectory multiple hidden>
+  <footer>SpeedRunIGT 기록 파일로 생성됨 · 이 페이지는 기록 폴더를 직접 읽습니다</footer>
+</div>
+
+<script>
+const EMBEDDED_RUNS = [{
+    "world": "Set Speedrun #690",
+    "date": 1783935255073,
+    "completed": true,
+    "igt": 846261,
+    "retimed": 846261,
+    "rta": 873741,
+    "splits": {
+      "found_villager": 8209,
+      "enter_nether": 133509,
+      "enter_bastion": 137646,
+      "enter_fortress": 336646,
+      "nether_travel": 522446,
+      "nether_travel_blind": 522446,
+      "enter_stronghold": 602310,
+      "portal_no_1": 737692,
+      "enter_end": 737692,
+      "kill_ender_dragon": 836220
+    },
+    "deaths": 2,
+    "blaze": 13,
+    "pearls": 13,
+    "mined": 140,
+    "ver": "1.16.1",
+    "cat": "ANY",
+    "rt": "set_seed"
+  }];
+const EMBEDDED_BUILT = 1784051140937;
+
+// ── helpers ──────────────────────────────────────────────
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2,"0");
+function fmt(ms, msec){ // 14:06.261 / 14:06
+  const m = Math.floor(ms/60000), s = Math.floor(ms%60000/1000);
+  return msec ? `${m}:${pad(s)}.${String(ms%1000).padStart(3,"0")}` : `${m}:${pad(s)}`;
+}
+function fmtDelta(ms){
+  if(ms === 0) return "0:00";
+  const sign = ms < 0 ? "-" : "+";
+  return sign + fmt(Math.abs(ms));
+}
+function fmtHM(ms){ // 742시간 5분 — for sums too long to read as m:ss
+  const totalMin = Math.round(ms/60000);
+  const h = Math.floor(totalMin/60), m = totalMin%60;
+  return h ? `${h}시간 ${m}분` : `${m}분`;
+}
+const fmtDate  = ms => { const d = new Date(ms); return `${d.getMonth()+1}월 ${d.getDate()}일`; };
+const fmtDateF = ms => { const d = new Date(ms); return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const CAT_LABEL = {ANY:"Any%", AA:"올 어드밴스먼트", HIGH:"High%"};
+const RT_LABEL  = {set_seed:"고정 시드", random_seed:"랜덤 시드"};
+const isRanked = r => r.world.startsWith("mcsrranked");
+
+// ── record json → compact run (JS port of the aggregation) ─
+// Note: SpeedRunIGT also writes a record file for runs that were never
+// finished (reset/died and abandoned) — is_completed:false. We keep those
+// too so failed attempts show up alongside completions.
+function aggregate(d){
+  if(!d || d.final_igt == null) return null;
+  let st = {};
+  try{ st = d.stats[Object.keys(d.stats)[0]].stats || {}; }catch(e){}
+  const g = (c,k) => (st[c] && st[c][k]) || 0;
+  return {
+    world: d.world_name, date: d.date, completed: !!d.is_completed,
+    igt: d.final_igt, retimed: d.retimed_igt ?? d.final_igt, rta: d.final_rta,
+    splits: Object.fromEntries((d.timelines||[]).map(t=>[t.name,t.igt])),
+    deaths: g("minecraft:custom","minecraft:deaths"),
+    blaze:  g("minecraft:killed","minecraft:blaze"),
+    pearls: g("minecraft:used","minecraft:ender_pearl"),
+    mined:  Object.values(st["minecraft:mined"]||{}).reduce((a,b)=>a+b,0),
+    ver: d.mc_version||"?", cat: d.category||"?", rt: d.run_type||"?",
+  };
+}
+
+// ── tiny indexeddb kv (cache + folder handle) ────────────
+function idb(){
+  return new Promise((res,rej)=>{
+    const q = indexedDB.open("srigt-viewer",1);
+    q.onupgradeneeded = () => q.result.createObjectStore("kv");
+    q.onsuccess = () => res(q.result);
+    q.onerror = () => rej(q.error);
+  });
+}
+async function idbGet(key){
+  try{
+    const db = await idb();
+    return await new Promise((res,rej)=>{
+      const q = db.transaction("kv").objectStore("kv").get(key);
+      q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+    });
+  }catch(e){ return undefined; }
+}
+async function idbSet(key,val){
+  try{
+    const db = await idb();
+    await new Promise((res,rej)=>{
+      const tx = db.transaction("kv","readwrite");
+      tx.objectStore("kv").put(val,key);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  }catch(e){}
+}
+
+// ── state ────────────────────────────────────────────────
+// byDate/byIgt/pbRun/rank only ever consider completed runs — an
+// unfinished attempt can't be a PB and shouldn't skew the trend chart.
+let RUNS=[], allByDate=[], completed=[], byDate=[], byIgt=[], pbRun=null, rank=new Map();
+let sortKey="date", filterKey="all", statusKey="all";
+
+function setData(runs, sourceMs){
+  if(!runs || !runs.length) return;
+  RUNS = runs;
+  allByDate = [...RUNS].sort((a,b)=>a.date-b.date);
+  completed = RUNS.filter(r=>r.completed);
+  byDate = [...completed].sort((a,b)=>a.date-b.date);
+  byIgt  = [...completed].sort((a,b)=>a.igt-b.igt);
+  pbRun  = byIgt[0] || null;
+  rank   = new Map(byIgt.map((r,i)=>[r,i+1]));
+  $("#data-note").textContent = `총 ${RUNS.length}개 런 · ${fmtDateF(sourceMs)} 기준`;
+  renderAll();
+}
+
+// ── rendering ────────────────────────────────────────────
+const uniq = f => [...new Set(RUNS.map(f))].join(", ");
+
+function renderAll(){
+  $("#subline").textContent =
+    `마인크래프트 ${uniq(r=>r.ver)} · ${uniq(r=>CAT_LABEL[r.cat]||r.cat)} · ${uniq(r=>RT_LABEL[r.rt]||r.rt)} · ${fmtDate(allByDate[0].date)} ~ ${fmtDate(allByDate[allByDate.length-1].date)}`;
+  $("#pb-toast").style.display = pbRun ? "" : "none";
+  if(pbRun) $("#pb-line").innerHTML =
+    `<b>${fmt(pbRun.igt,true)}</b> &nbsp;<span>${pbRun.world} · ${fmtDate(pbRun.date)}</span>`;
+
+  const failed = RUNS.filter(r=>!r.completed);
+  const igts = completed.map(r=>r.igt);
+  const avg = igts.length ? Math.round(igts.reduce((a,b)=>a+b,0)/igts.length) : 0;
+  const clearRate = RUNS.length ? Math.round(completed.length/RUNS.length*100) : 0;
+  const totalPlaytime = RUNS.reduce((a,r)=>a+r.igt,0);
+  $("#tiles").innerHTML = [
+    ["완주 횟수", completed.length, ""],
+    ["클리어율", clearRate+"%", ""],
+    ["실패 횟수", failed.length, ""],
+    ["평균 IGT", igts.length ? fmt(avg) : "—", "time"],
+    ["총 시도", RUNS.length, ""],
+    ["총 플레이타임", fmtHM(totalPlaytime), "time"],
+    ["최근 PB", pbRun ? fmtDate(pbRun.date) : "—", ""],
+  ].map(([lab,val,cls]) =>
+    `<div class="tile panel"><div class="lab">${lab}</div><div class="val ${cls}">${val}</div></div>`
+  ).join("");
+  $("#list-note").textContent = `완주 ${completed.length} · 실패 ${failed.length} · 랭크드 ${RUNS.filter(isRanked).length} · 기타 ${RUNS.filter(r=>!isRanked(r)).length}`;
+
+  renderChart();
+  renderList();
+}
+
+function renderChart(){
+  const box = $("#chart-box");
+  const old = box.querySelector("svg"); if(old) old.remove();
+  if(!byDate.length) return; // no completed runs yet — nothing to trend
+
+  const igts = byDate.map(r=>r.igt);
+  const W=820, H=230, L=52, R=14, T=16, B=30;
+  const t0 = byDate[0].date, t1 = byDate[byDate.length-1].date;
+  const span = Math.max(1, t1-t0);
+  const yMin = Math.max(0, Math.floor((Math.min(...igts)-40000)/60000))*60000;
+  const yMax = Math.ceil((Math.max(...igts)+40000)/60000)*60000;
+  const x = t => L + (t-t0)/span*(W-L-R);
+  const y = v => T + (1-(v-yMin)/(yMax-yMin))*(H-T-B);
+
+  let g = "";
+  const yStep = [60000,120000,300000,600000,1200000].find(s=>(yMax-yMin)/s<=6) || 1200000;
+  for(let v=Math.ceil(yMin/yStep)*yStep; v<=yMax; v+=yStep){
+    g += `<line x1="${L}" y1="${y(v)}" x2="${W-R}" y2="${y(v)}" stroke="rgba(255,255,255,.08)" stroke-width="1"/>`;
+    g += `<text class="tick-t" x="${L-8}" y="${y(v)+4}" text-anchor="end">${fmt(v)}</text>`;
+  }
+  const d0 = new Date(t0);
+  for(let m=new Date(d0.getFullYear(),d0.getMonth()+1,1); m.getTime()<t1; m.setMonth(m.getMonth()+1)){
+    const tx = x(m.getTime());
+    g += `<line x1="${tx}" y1="${T}" x2="${tx}" y2="${H-B}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>`;
+    g += `<text class="tick-t" x="${tx}" y="${H-B+18}" text-anchor="middle">${m.getMonth()+1}월</text>`;
+  }
+  const pts = byDate.map(r=>[x(r.date), y(r.igt), r]);
+  if(pts.length > 1)
+    g += `<polyline fill="none" stroke="var(--xp)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${pts.map(p=>p[0]+","+p[1]).join(" ")}"/>`;
+  for(const [px,py,r] of pts){
+    const pb = r===pbRun;
+    g += `<circle cx="${px}" cy="${py}" r="4.5" fill="${pb?"var(--gold)":"var(--xp)"}" stroke="var(--surface)" stroke-width="2"/>`;
+    if(pb){
+      const anchor = px > W-110 ? "end" : px < L+60 ? "start" : "middle";
+      const lx = anchor==="end" ? px-9 : anchor==="start" ? px+9 : px;
+      g += `<text class="tick-t" x="${lx}" y="${py-10}" text-anchor="${anchor}" style="fill:var(--yellow)">PB ${fmt(r.igt)}</text>`;
+    }
+  }
+  g += `<line id="cross" x1="0" x2="0" y1="${T}" y2="${H-B}" stroke="rgba(255,255,85,.4)" stroke-width="1" visibility="hidden"/>`;
+  g += `<circle id="hover-ring" r="7" fill="none" stroke="var(--yellow)" stroke-width="2" visibility="hidden"/>`;
+  g += `<rect id="hit" x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="transparent"/>`;
+
+  box.insertAdjacentHTML("beforeend",
+    `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="완주한 런들의 IGT를 시간순으로 나타낸 선 그래프입니다. 정확한 값은 아래 목록에서 확인하세요.">${g}</svg>`);
+
+  const svg = box.querySelector("svg"), tip = $("#chart-tip"),
+        cross = svg.querySelector("#cross"), ring = svg.querySelector("#hover-ring"),
+        hit = svg.querySelector("#hit");
+  function move(ev){
+    const rect = svg.getBoundingClientRect(), brect = box.getBoundingClientRect();
+    const mx = (ev.clientX-rect.left)*W/rect.width;
+    let best=null, bd=1e9;
+    for(const p of pts){ const d=Math.abs(p[0]-mx); if(d<bd){bd=d;best=p;} }
+    if(!best) return;
+    const [px,py,r] = best;
+    cross.setAttribute("x1",px); cross.setAttribute("x2",px); cross.setAttribute("visibility","visible");
+    ring.setAttribute("cx",px); ring.setAttribute("cy",py); ring.setAttribute("visibility","visible");
+    tip.style.display="block";
+    tip.innerHTML = `<div class="tt-time">${fmt(r.igt,true)}</div><div>${r.world}</div><div class="tt-sub">${fmtDateF(r.date)} · RTA ${fmt(r.rta)}</div>`;
+    const bx = (rect.left-brect.left) + px*rect.width/W;
+    const by = (rect.top-brect.top) + py*rect.height/H;
+    const tw = tip.offsetWidth;
+    tip.style.left = Math.min(Math.max(bx - tw/2, 4), brect.width - tw - 4) + "px";
+    tip.style.top  = Math.max(by - tip.offsetHeight - 16, 0) + "px";
+  }
+  function leave(){ tip.style.display="none"; cross.setAttribute("visibility","hidden"); ring.setAttribute("visibility","hidden"); }
+  hit.addEventListener("pointermove",move);
+  hit.addEventListener("pointerleave",leave);
+}
+
+const SPLITS = [
+  ["found_villager","촌민 찾기"],
+  ["enter_nether","네더 진입"],
+  ["enter_bastion","베스천 진입"],
+  ["enter_fortress","네더 요새 진입"],
+  ["nether_travel","네더 탈출"],
+  ["enter_stronghold","스트롱홀드 진입"],
+  ["enter_end","엔드 진입"],
+  ["kill_ender_dragon","드래곤 처치"],
+];
+const PHASE_OF = {
+  enter_nether:"ow", nether_travel:"nether", enter_end:"sh", kill_ender_dragon:"end",
+};
+
+// Builds the phase segments a run actually reached, in order, ending at
+// whichever phase was in progress when the run stopped (death/reset) —
+// SpeedRunIGT records no death coordinates, so this is the closest thing
+// to "where it ended" we can derive from the timeline splits.
+function phaseSegments(r){
+  const {enter_nether, nether_travel, enter_end} = r.splits;
+  const segs = [];
+  if(enter_nether == null){ segs.push(["오버월드","p0",r.igt]); return segs; }
+  segs.push(["오버월드","p0",enter_nether]);
+  if(nether_travel == null){ segs.push(["네더","p1",r.igt-enter_nether]); return segs; }
+  segs.push(["네더","p1",nether_travel-enter_nether]);
+  if(enter_end == null){ segs.push(["스트롱홀드 탐색","p2",r.igt-nether_travel]); return segs; }
+  segs.push(["스트롱홀드 탐색","p2",enter_end-nether_travel]);
+  segs.push(["엔드","p3",r.igt-enter_end]);
+  return segs;
+}
+const lastPhase = r => phaseSegments(r).at(-1)[0];
+
+function dimbar(r){
+  const total = r.igt;
+  const segs = phaseSegments(r);
+  const seg = segs.map(([name,cls,v])=>
+    `<i class="${cls}" style="flex-grow:${Math.max(0,v)}" title="${name} ${fmt(v,true)} (${Math.round(v/total*100)}%)"></i>`
+  ).join("");
+  return `<div class="dimbar slot" role="img" aria-label="구간별 소요 시간: ${
+    segs.map(([name,,v])=>`${name} ${fmt(Math.max(0,v))}`).join(", ")}">${seg}</div>`;
+}
+
+function runCard(r){
+  const pb = r===pbRun;
+  const rk = r.completed ? rank.get(r) : null;
+  const rows = SPLITS.filter(([k])=>r.splits[k]!=null).map(([k,label],i,arr)=>{
+    const t = r.splits[k];
+    const prev = i===0 ? 0 : r.splits[arr[i-1][0]];
+    const dRef = pbRun && pbRun.splits[k];
+    let delta = "";
+    if(dRef!=null && !pb){
+      const d = t - dRef;
+      delta = `<span class="${d<0?"d-good":d>0?"d-bad":"d-zero"}">${fmtDelta(d)}</span>`;
+    } else delta = `<span class="d-zero">${pb?"기준":"—"}</span>`;
+    const ph = PHASE_OF[k] ? `<span class="dot" style="background:var(--${PHASE_OF[k]})"></span>` : `<span class="dot" style="background:transparent;border-color:transparent"></span>`;
+    return `<tr><td>${ph}${label}</td><td class="num">${fmt(t,true)}</td><td class="num">+${fmt(t-prev)}</td><td class="num">${delta}</td></tr>`;
+  }).join("");
+  const fin = r.completed
+    ? `<tr class="total"><td><span class="dot" style="background:transparent;border-color:transparent"></span>완주</td><td class="num">${fmt(r.igt,true)}</td><td class="num"></td><td class="num">${pb||!pbRun?"":`<span class="${r.igt>pbRun.igt?"d-bad":"d-zero"}">${fmtDelta(r.igt-pbRun.igt)}</span>`}</td></tr>`
+    : `<tr class="total fail"><td><span class="dot" style="background:transparent;border-color:transparent"></span>런 종료</td><td class="num">${fmt(r.igt,true)}</td><td class="num"></td><td class="num">${lastPhase(r)}</td></tr>`;
+  return `<details class="run panel${pb?" pb":""}${r.completed?"":" fail"}">
+    <summary>
+      <div class="run-top">
+        <span class="arrow">▶</span>
+        ${r.completed?`<span class="rank r${rk<=3?rk:""}">#${rk}</span>`:'<span class="rank fail">미완주</span>'}
+        <span class="wname">${r.world}</span>
+        ${pb?'<span class="pbtag">PB</span>':""}
+        ${r.completed?"":'<span class="failtag">실패</span>'}
+        <span class="rdate">${fmtDateF(r.date)}</span>
+      </div>
+      <div class="run-time">
+        <span class="igt">${fmt(r.igt,true)}</span>
+        <span class="rta">RTA ${fmt(r.rta)}</span>
+        ${r.completed?"":`<span class="died-at">${lastPhase(r)}에서 종료</span>`}
+      </div>
+      ${dimbar(r)}
+    </summary>
+    <div class="run-body">
+      <div class="tscroll"><table>
+        <thead><tr><th>구간</th><th class="num">시간</th><th class="num">구간 시간</th><th class="num">PB 대비</th></tr></thead>
+        <tbody>${rows}${fin}</tbody>
+      </table></div>
+      <p class="mini">사망 ${r.deaths} · 블레이즈 처치 ${r.blaze} · 엔더 진주 사용 ${r.pearls} · 블록 채굴 ${r.mined.toLocaleString()}</p>
+    </div>
+  </details>`;
+}
+
+function renderList(){
+  // "빠른순"은 완주한 런만 대상으로 하는 랭킹입니다 — 죽거나 포기한 런은
+  // 완주 시간이 없으므로 이 정렬에서 제외됩니다.
+  let rs;
+  if(sortKey==="igt"){
+    rs = byIgt.slice();
+  }else{
+    rs = [...RUNS].sort((a,b)=>b.date-a.date);
+  }
+  if(statusKey==="completed") rs = rs.filter(r=>r.completed);
+  if(statusKey==="failed")    rs = rs.filter(r=>!r.completed);
+  if(filterKey==="ranked") rs = rs.filter(isRanked);
+  if(filterKey==="set")    rs = rs.filter(r=>!isRanked(r));
+  $("#list").innerHTML = rs.length ? rs.map(runCard).join("")
+    : `<p class="mini panel" style="padding:14px">현재 필터에 맞는 런이 없습니다.</p>`;
+}
+document.querySelectorAll("[data-sort]").forEach(b=>b.addEventListener("click",()=>{
+  sortKey=b.dataset.sort;
+  document.querySelectorAll("[data-sort]").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  renderList();
+}));
+document.querySelectorAll("[data-status]").forEach(b=>b.addEventListener("click",()=>{
+  statusKey=b.dataset.status;
+  document.querySelectorAll("[data-status]").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  renderList();
+}));
+document.querySelectorAll("[data-filter]").forEach(b=>b.addEventListener("click",()=>{
+  filterKey=b.dataset.filter;
+  document.querySelectorAll("[data-filter]").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  renderList();
+}));
+
+// ── live folder reading (single-file refresh) ────────────
+async function scanDir(handle){
+  const runs = [];
+  let jsonSeen = 0;
+  for await (const entry of handle.values()){
+    if(entry.kind !== "file" || !entry.name.endsWith(".json")) continue;
+    jsonSeen++;
+    try{
+      const d = JSON.parse(await (await entry.getFile()).text());
+      const r = aggregate(d);
+      if(r) runs.push(r);
+    }catch(e){ /* skip files that are still being written or are corrupted */ }
+  }
+  return {runs, jsonSeen};
+}
+
+function note(msg, warn){
+  const el = $("#refresh-note");
+  el.textContent = msg || "";
+  el.className = warn ? "warn" : "";
+}
+
+async function refresh(){
+  const btn = $("#btn-refresh");
+  btn.disabled = true; note("읽는 중…");
+  try{
+    if(!window.showDirectoryPicker) throw new TypeError("unsupported");
+    let dir = await idbGet("dir");
+    if(dir){
+      const p = await dir.requestPermission({mode:"read"});
+      if(p !== "granted") dir = null;
+    }
+    if(!dir){
+      dir = await showDirectoryPicker({id:"srigt-records"});
+    }
+    const {runs, jsonSeen} = await scanDir(dir);
+    if(!runs.length){
+      note(jsonSeen ? "유효한 기록을 찾을 수 없습니다" : "이 폴더에는 기록(json) 파일이 없습니다 — 기록 폴더를 선택해주세요", true);
+    }else{
+      const now = Date.now();
+      await idbSet("dir", dir);
+      await idbSet("cache", {runs, time: now});
+      setData(runs, now);
+      note("");
+    }
+  }catch(e){
+    if(e.name === "AbortError"){ note(""); }               // user canceled
+    else if(e instanceof TypeError || e.name === "SecurityError"){
+      note(""); $("#dir-input").click();                    // folder picker dialog (legacy fallback)
+    }
+    else note("읽기 실패: " + e.message, true);
+  }finally{
+    btn.disabled = false;
+  }
+}
+$("#btn-refresh").addEventListener("click", refresh);
+
+$("#dir-input").addEventListener("change", async ev => {
+  const files = [...ev.target.files].filter(f=>f.name.endsWith(".json"));
+  const runs = [];
+  for(const f of files){
+    try{ const r = aggregate(JSON.parse(await f.text())); if(r) runs.push(r); }catch(e){}
+  }
+  if(runs.length){
+    const now = Date.now();
+    await idbSet("cache", {runs, time: now});
+    setData(runs, now);
+    note("");
+  }else note("유효한 기록을 찾을 수 없습니다", true);
+  ev.target.value = "";
+});
+
+// ── pixel art & background ───────────────────────────────
+function drawPix(canvas, rows, colors){
+  const c = canvas.getContext("2d");
+  rows.forEach((row,y)=>[...row].forEach((ch,x)=>{
+    if(ch===".") return;
+    c.fillStyle = colors[ch]; c.fillRect(x,y,1,1);
+  }));
+}
+drawPix($("#ico-grass"), [
+  "gggggggggg","gGgggGgggg","dgdGgdgGgd","dddddddddd","dDddZddddD",
+  "ddddddDddd","dZdDdddZdd","dddddddDdd","dDddddZddd","dddDdddddd"
+],{g:"#6ba13c",G:"#7fb954",d:"#8a5a34",D:"#6e4526",Z:"#9c6b3f"});
+drawPix($("#ico-egg"), [
+  "....aaaa....","...aabbaa...","..abbbbbba..",".abbcbbbbba.",".abbbbbdbba.",
+  "aabdbbbbbbaa","abbbbbcbbbba","abbcbbbbbdba","abbbbdbbbbba","abdbbbbcbbba",
+  ".abbbbbbbba.","..abbdbbba..","...aabbaa...","....aaaa...."
+],{a:"#0b0612",b:"#241335",c:"#5e3a8c",d:"#8d5bbf"});
+(function dirt(){
+  const c = document.createElement("canvas"); c.width=c.height=32;
+  const ctx = c.getContext("2d");
+  let seed = 1613;
+  const rnd = () => (seed = seed*16807%2147483647)/2147483647;
+  const tones = ["#231409","#2b1a0c","#33200f","#1d1108","#291807"];
+  for(let y=0;y<32;y++)for(let x=0;x<32;x++){
+    ctx.fillStyle = tones[Math.floor(rnd()*tones.length)];
+    ctx.fillRect(x,y,1,1);
+  }
+  document.body.style.backgroundImage = `url(${c.toDataURL()})`;
+  document.body.style.backgroundSize = "256px 256px";
+})();
+
+// ── init: embedded snapshot → newer cache if present ─────
+setData(EMBEDDED_RUNS, EMBEDDED_BUILT);
+idbGet("cache").then(c => {
+  if(c && c.time > EMBEDDED_BUILT && c.runs && c.runs.length) setData(c.runs, c.time);
+});
+</script>
+</body>
+</html>
