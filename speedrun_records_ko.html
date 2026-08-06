@@ -252,7 +252,7 @@
     </div>
     <div class="datastate">
       <span id="data-note"></span>
-      <button class="mcbtn small" id="btn-refresh">새로고침</button>
+      <button class="mcbtn small" id="btn-refresh" title="SpeedRunIGT 전역 records 폴더 — Windows: %APPDATA%\speedrunigt\records · macOS: ~/Library/Application Support/speedrunigt/records · Linux: ~/.local/share/speedrunigt/records">새로고침</button>
       <span id="refresh-note"></span>
     </div>
   </header>
@@ -290,7 +290,7 @@
   <div class="legend">
     <span class="key"><span class="sw" style="background:var(--ow)"></span>오버월드</span>
     <span class="key"><span class="sw" style="background:var(--nether)"></span>네더</span>
-    <span class="key"><span class="sw" style="background:var(--sh)"></span>스트롱홀드 탐색</span>
+    <span class="key"><span class="sw" style="background:var(--sh)"></span>엔더유적 탐색</span>
     <span class="key"><span class="sw" style="background:var(--end)"></span>엔드</span>
   </div>
 
@@ -532,12 +532,12 @@ function renderChart(){
 }
 
 const SPLITS = [
-  ["found_villager","촌민 찾기"],
+  ["found_villager","마을 찾기"],
   ["enter_nether","네더 진입"],
-  ["enter_bastion","베스천 진입"],
+  ["enter_bastion","바스티온 진입"],
   ["enter_fortress","네더 요새 진입"],
   ["nether_travel","네더 탈출"],
-  ["enter_stronghold","스트롱홀드 진입"],
+  ["enter_stronghold","엔더유적 진입"],
   ["enter_end","엔드 진입"],
   ["kill_ender_dragon","드래곤 처치"],
 ];
@@ -556,8 +556,8 @@ function phaseSegments(r){
   segs.push(["오버월드","p0",enter_nether]);
   if(nether_travel == null){ segs.push(["네더","p1",r.igt-enter_nether]); return segs; }
   segs.push(["네더","p1",nether_travel-enter_nether]);
-  if(enter_end == null){ segs.push(["스트롱홀드 탐색","p2",r.igt-nether_travel]); return segs; }
-  segs.push(["스트롱홀드 탐색","p2",enter_end-nether_travel]);
+  if(enter_end == null){ segs.push(["엔더유적 탐색","p2",r.igt-nether_travel]); return segs; }
+  segs.push(["엔더유적 탐색","p2",enter_end-nether_travel]);
   segs.push(["엔드","p3",r.igt-enter_end]);
   return segs;
 }

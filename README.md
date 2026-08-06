@@ -29,10 +29,21 @@ Minecraft SpeedRunIGT 완주 기록을 확인할 수 있는 단일 HTML 대시�
 
 1. Open either HTML file in a browser.<br>
    브라우저에서 두 HTML 파일 중 하나를 엽니다.
-2. Click **Refresh** and select your world's `speedrunigt/records` folder.<br>
-   **Refresh**(새로고침) 버튼을 누르고 월드의 `speedrunigt/records` 폴더를 선택합니다.
-3. Records are cached locally (IndexedDB), so the page loads instantly next time.<br>
-   기록은 로컬(IndexedDB)에 캐시되어 다음에 열 때 바로 불러옵니다.
+2. Click **Refresh** and select SpeedRunIGT's global `records` folder (path below).<br>
+   **Refresh**(새로고침) 버튼을 누르고 아래 경로에 있는 SpeedRunIGT의 전역 `records` 폴더를 선택합니다.
+3. Records are cached locally (IndexedDB), so the folder only needs to be picked once — next time the page loads instantly without prompting.<br>
+   기록은 로컬(IndexedDB)에 캐시되어 폴더는 한 번만 선택하면 됩니다 — 다음부터는 다시 묻지 않고 바로 불러옵니다.
+
+### Where the records folder is / 기록 폴더 위치
+
+SpeedRunIGT collects records from every world into one global folder, not a per-world folder.<br>
+SpeedRunIGT는 월드별이 아니라 하나의 전역 폴더에 모든 월드의 기록을 모읍니다.
+
+| OS | Path |
+|---|---|
+| Windows | `%APPDATA%\speedrunigt\records` |
+| macOS | `~/Library/Application Support/speedrunigt/records` |
+| Linux | `~/.local/share/speedrunigt/records` (or `$XDG_DATA_HOME/speedrunigt/records` if set) |
 
 ## Note
 
